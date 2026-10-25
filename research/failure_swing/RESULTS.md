@@ -109,3 +109,114 @@ python3 baseline.py       # tabla 1 (y genera data/bars.pkl)
 python3 by_year.py        # sección 2
 python3 robustness.py     # secciones 3, 4 y 5 (~10 min con 4 núcleos)
 ```
+
+---
+
+# Iteraciones para hacerla rentable
+
+## Protocolo
+
+- **Costes:** 0,15% por lado (0,1% de comisión y 0,05% de deslizamiento), con prueba de estrés al 0,25%.
+- **Datos:** BTC/USD de Bitstamp desde 2013-06 (`min_full.npz`).
+  - Desarrollo: 2018-08 → 2022.
+  - Validación: 2023-2024.
+  - Dos reservas que no se tocaron hasta la decisión final: 2014-2017 (otro régimen de mercado) y 2025-01 → 2026-10.
+  - No hubo acceso a datos de otros activos: los hosts de exchanges están bloqueados en el entorno.
+- **Criterios de éxito, fijados antes de abrir las reservas:**
+  1. CAGR > 0 y PF > 1 en validación y en ambas reservas.
+  2. Entradas aleatorias superadas con p < 0,05.
+  3. Resultado positivo con costes del 0,25%.
+  4. Al menos el 80% de las configuraciones vecinas positivas.
+
+## Iteración 1: filtros sobre la falsa ruptura (`dev_grid.py`, 1.728 variantes)
+
+Se probaron filtro de tendencia (SMA de 50 o 200 días), dirección (solo largos, solo cortos o ambos), stop bajo
+la mecha ± ATR, objetivos de 1R/2R/3R o la EMA, y salida por tiempo, en 1h, 4h y 1D. **El mejor estadístico t
+fue 1,58.** Con 1.728 variantes, el máximo esperable por azar ronda 3,3, así que no hay ventaja demostrable.
+
+## Iteración 2: confirmar el barrido de stops (`dev_grid2.py`, 384 variantes)
+
+Se añadieron un rechazo fuerte (cierre en el 40% de la vela más alejado de la mecha), volumen anómalo
+(z ≥ 1,5), un objetivo de 5R y trailing stops. Las medianas de toda la familia pasaron a ser positivas en
+desarrollo (t ≈ 0,7, PF ≈ 1,25). Una configuración elegida por medianas, no por máximo (`cand.py`), batía a
+las entradas aleatorias en desarrollo, pero **falló en la validación 2023-24**: PF de 0,36 a 1,01 según la
+temporalidad. Descartada.
+
+## Estudio de eventos (`event.py`, 2018-08 → 2024)
+
+Mide, sin reglas de salida, el retorno posterior a cada evento en unidades de ATR, comparado con todas las velas
+del mismo régimen. Se hizo para 5 temporalidades, 3 periodos y 3 regímenes.
+
+- **Falsa ruptura** (la premisa de la estrategia): estadístico t negativo en casi todas las celdas, entre −1 y −4.
+  Tras barrer un mínimo y cerrar dentro, el precio sigue cayendo. Tras barrer un máximo, sigue subiendo.
+  **La premisa es falsa en BTC.**
+- **Ruptura real** (cierre más allá del nivel): continuación con t entre +3 y +6 en todas las temporalidades y
+  periodos, también dentro del mismo régimen de tendencia. Es el conocido efecto de momentum en series
+  temporales.
+
+## Iteración 3: operar la ruptura de los mismos niveles (`bo_grid.py`, 320 variantes)
+
+Mismos niveles de 84 velas que la estrategia original, pero con entrada al cerrar más allá del nivel y salida
+por trailing de k·ATR. En desarrollo, el 78% de las variantes es rentable, y en 4h hay una meseta estable
+(Sharpe de 0,6 a 1,2 para periodos de 42-168 y k de 3-5). Se eligió el centro de esa meseta, no el máximo:
+**4h, periodo 84, trailing de 4 ATR, filtro SMA de 50 días, largos y cortos**. Esta es la estrategia
+*Support Resistance Breakout Strategy v6.pine*.
+
+### Resultados fuera de muestra (`final.py`, `final_tests.py`)
+
+| Periodo | Operaciones | PF | CAGR | Máx. DD | Sharpe | Comprar y mantener (CAGR / DD / Sharpe) |
+|---|---|---|---|---|---|---|
+| Desarrollo 2018-08 → 2022 | 79 | 2,46 | +64% | −41% | 1,27 | +20% / −77% / 0,61 |
+| Validación 2023-24 | 44 | 1,71 | +32% | −31% | 1,00 | +138% / −30% / 2,01 |
+| Reserva 2014-2017 | 68 | 3,48 | +116% | −35% | 1,76 | +108% / −82% / 1,35 |
+| **Reserva 2025 → 2026-10** | 42 | **0,86** | **−10%** | −28% | −0,24 | −8% / −54% / 0,02 |
+
+Con costes del 0,25% por lado, el CAGR baja a +26% en validación, a +108% en 2014-17 y a −14% en 2025-26.
+Configuraciones vecinas (periodo {42, 84, 168} × k {3, 4, 5} × dirección): positivas el 94% en validación, el
+100% en 2014-17 y **el 28% en 2025-26**.
+
+Periodo completo 2014 → 2026-10, como referencia (incluye datos de desarrollo): 246 operaciones, PF 2,18,
+CAGR +53%, máx. DD −44%, Sharpe 1,17, frente a +44%, −84% y 0,88 de comprar y mantener. Gana en 11 de 13 años;
+pierde en 2018 (−3%) y 2025 (−22%).
+
+### Pruebas contra el azar
+
+- **Las 154 operaciones fuera de muestra** (validación y ambas reservas): +2,8% de media por operación,
+  **t = 3,0**. En 300 simulaciones con entradas aleatorias del mismo régimen, mismo número de operaciones y
+  las mismas salidas, ninguna iguala la suma de retornos (p < 0,003).
+- **Por tramos, contra entradas aleatorias** (Sharpe): desarrollo p = 0,03, validación p = 0,38,
+  2014-17 p = 0,05, 2025-26 p = 0,50. Gran parte del resultado viene de la estructura de la estrategia (filtro
+  de tendencia más trailing stop), que ya es rentable con entradas al azar. El momento de la ruptura añade
+  valor claro en 2014-2022, pero no en 2023-2026.
+- **2025-26 frente a la historia:** en un remuestreo de 42 operaciones tomadas de la distribución previa, solo
+  el 1,1% de las veces sale una media tan mala. Es más probable un deterioro de la ventaja que una mala racha
+  normal.
+
+## Veredicto
+
+- **La Failure Swing original no tiene arreglo en BTC:** su premisa está refutada por los datos.
+- **La versión de ruptura sobre los mismos niveles tiene una ventaja real a largo plazo.** Es significativa
+  fuera de muestra (t = 3,0 en 154 operaciones) y consistente en un régimen que no se usó para diseñarla
+  (2014-17).
+- **No cumple todos los criterios fijados de antemano.** Pierde en la reserva más reciente (2025-26), sus
+  vecinas también, y ese tramo es estadísticamente anómalo frente a su historia. No se puede afirmar que sea
+  rentable *hoy*.
+- **En años alcistas no supera a comprar y mantener** (2017, 2019-2021, 2023-24). Su valor está en el
+  drawdown, que es la mitad.
+- **Ya no queda ningún dato de BTC sin usar.** Seguir ajustando con estos datos sería sobreajuste. La única
+  prueba limpia que queda es el forward test con datos nuevos, o probarla en otros activos.
+
+### Variantes probadas en total
+
+1.728 + 384 + 1 (iteraciones 1-2), más el estudio de eventos (360 celdas), más 320 (iteración 3), más 54
+vecinas. Solo una configuración llegó a las reservas.
+
+### Cómo reproducirlo
+
+```bash
+python3 prepare_data.py                     # min.npz y min_full.npz
+python3 dev_grid.py && python3 dev_grid2.py # iteraciones 1-2 (crea data/bars_full.pkl)
+python3 cand.py                             # candidata de la iteración 2 frente al azar
+python3 event.py && python3 bo_grid.py      # estudio de eventos e iteración 3
+python3 final.py && python3 final_tests.py  # validación, reservas y pruebas contra el azar
+```

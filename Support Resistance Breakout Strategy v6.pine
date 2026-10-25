@@ -1,0 +1,71 @@
+//@version=6
+//
+// ----------------------------------------------------------------------------
+// Support/Resistance Breakout Strategy
+// ----------------------------------------------------------------------------
+// Evolution of the Failure Swing strategy. It uses the same support/resistance levels
+// (highest high / lowest low of the previous 84 bars), but research on BTC/USD 2014-2026
+// showed that false breaks of those levels do not lead to reversals, while closes beyond
+// them lead to continuation. So it trades the breakout instead of its failure:
+// - Long when the close breaks above resistance and the close is above the trend SMA.
+// - Short when the close breaks below support and the close is below the trend SMA.
+// - Exit with an ATR chandelier trailing stop (extreme close since entry -/+ k * ATR).
+// An opposite signal reverses the position. Designed and tested on 4h bars.
+// Research and caveats: research/failure_swing/RESULTS.md
+
+strategy("S/R Breakout Strategy", overlay = true, initial_capital = 1000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 100, pyramiding = 0,
+     commission_type = strategy.commission.percent, commission_value = 0.15,
+     margin_long = 100, margin_short = 100)
+
+period     = input.int(84, "Support & Resistance", minval = 2)
+trailK     = input.float(4, "Trailing stop (ATR multiple)", minval = 0.5, step = 0.5)
+atrLen     = input.int(14, "ATR length", minval = 1)
+trendDays  = input.int(50, "Trend SMA (days)", minval = 0, tooltip = "0 disables the trend filter")
+allowShort = input.bool(true, "Allow Short")
+fromDate   = input.time(timestamp("01 Jan 2014 00:00 +0000"), "From")
+toDate     = input.time(timestamp("31 Dec 2099 23:59 +0000"), "To")
+
+resistance = ta.highest(high[1], period)
+support    = ta.lowest(low[1], period)
+atr        = ta.atr(atrLen)
+trendLen   = math.max(1, math.round(trendDays * 86400 / timeframe.in_seconds()))
+trendSma   = ta.sma(close, trendLen)
+
+inRange    = time >= fromDate and time <= toDate
+upTrend    = trendDays == 0 or close > trendSma
+downTrend  = trendDays == 0 or close < trendSma
+longSignal  = inRange and close > resistance and upTrend
+shortSignal = inRange and allowShort and close < support and downTrend
+
+if longSignal
+    strategy.entry("Long", strategy.long, comment = "Long")
+if shortSignal
+    strategy.entry("Short", strategy.short, comment = "Short")
+
+//TRAILING STOP: levels computed at the close are used by the orders of the next bar
+var float longStop  = na
+var float longExt   = na
+var float shortStop = na
+var float shortExt  = na
+if longSignal and strategy.position_size <= 0
+    longStop := close - trailK * atr
+    longExt  := close
+else if strategy.position_size > 0
+    longExt  := math.max(longExt, close)
+    longStop := math.max(longStop, longExt - trailK * atr)
+if shortSignal and strategy.position_size >= 0
+    shortStop := close + trailK * atr
+    shortExt  := close
+else if strategy.position_size < 0
+    shortExt  := math.min(shortExt, close)
+    shortStop := math.min(shortStop, shortExt + trailK * atr)
+
+strategy.exit("Exit Long", "Long", stop = longStop)
+strategy.exit("Exit Short", "Short", stop = shortStop)
+
+plot(resistance, "Resistance", color.gray, 1)
+plot(support, "Support", color.gray, 1)
+plot(trendDays > 0 ? trendSma : na, "Trend SMA", color.yellow, 1)
+plot(strategy.position_size > 0 ? longStop : na, "Stop Long", color.red, 2, plot.style_circles)
+plot(strategy.position_size < 0 ? shortStop : na, "Stop Short", color.red, 2, plot.style_circles)

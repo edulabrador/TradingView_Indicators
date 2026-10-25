@@ -49,4 +49,9 @@
   stop/limit orders and entries can be restricted to the side of the EMA. A backtest on BTC/USD (2018-2026,
   1-minute intrabar resolution) found it unprofitable on every timeframe; see
   [research/failure_swing/RESULTS.md](research/failure_swing/RESULTS.md).
+
+- **Support/Resistance Breakout (v6):**
+  Same 84-bar support/resistance levels as Failure Swing, but it trades the breakout instead of its failure,
+  with a 50-day SMA trend filter and an ATR trailing stop (4h bars). Out of sample on BTC/USD it was profitable
+  in 2014-2017 and 2023-2024 (154 trades, t = 3.0) but lost in 2025-2026; see the same research report.
   
