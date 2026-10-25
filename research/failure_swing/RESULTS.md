@@ -267,3 +267,114 @@ python3 final.py && python3 final_tests.py  # validación, reservas y pruebas co
 ./prepare_alts.sh                           # 12 pares de Binance (~2,5 GB descargados, ~2,4 GB en data/)
 python3 cross.py && python3 cross2.py       # prueba entre activos, costes y cartera
 ```
+
+---
+
+# Batería de robustez (`robust.py`, motor rápido `fast.py`)
+
+`fast.py` es un motor a nivel de vela. Como la estrategia solo sale por stop, reproduce exactamente al motor de
+1 minuto: en BTC 2014-26 salen 246 operaciones, CAGR 52,6% y Sharpe 1,168 en ambos. La "cartera" de esta sección
+reparte el capital a partes iguales entre los 12 pares de Binance y se rebalancea cada día, por eso sus cifras
+difieren algo de la cartera sin rebalanceo de la sección anterior.
+
+**Forward test real:** no es posible todavía. Los datos terminan el 24/10/2026, el mismo día en que se registró
+el forward test (`FORWARD_TEST.md`). Las pruebas siguientes son las aproximaciones estándar a un forward.
+
+## 1. Walk-forward (reoptimización cada 6 meses con los 3 años previos, rejilla de 100 configuraciones)
+
+| Cartera de 12 pares, solo tramos fuera de muestra (2020-11 → 2026-10) | CAGR | Máx. DD | Sharpe |
+|---|---|---|---|
+| WFO, mejor Sharpe del entrenamiento | +14,0% | −53% | 0,53 |
+| WFO, centro de meseta | +16,1% | −42% | 0,57 |
+| Configuración congelada (84 / 4 ATR / SMA 50) | +31,8% | −38% | 0,90 |
+| Comprar y mantener | +47,8% | −74% | 0,91 |
+
+- Reoptimizar **empeora** el resultado. La eficiencia del walk-forward (Sharpe fuera de muestra / Sharpe en
+  muestra) es de 0,18: optimizar persigue ruido y tiende a elegir periodos cortos y trailings amplios.
+- El proceso sigue ganando dinero, pero con la mitad de Sharpe que la configuración fija.
+- Lectura: la ventaja es un efecto estructural amplio (momentum) que no gana nada afinándolo. Opérala con
+  parámetros fijos y no la reoptimices.
+- Por activo, el WFO pierde en LTC, LINK, TRX y AVAX, igual que la configuración fija.
+
+## 2. Monte Carlo de retornos
+
+**Cartera, bootstrap por bloques de 30 días, 10.000 trayectorias de 5 años.** Cartera histórica: 2017-10 a
+2026-10, CAGR +34,5%, DD −39%, Sharpe 0,91.
+
+| Métrica | p5 | p50 | p95 |
+|---|---|---|---|
+| CAGR a 5 años | +2% | +34% | +84% |
+| Máx. DD | −60% | −40% | −27% |
+
+- P(perder en 5 años) = **3,9%**. P(drawdown peor que −50%) = 19%. P(drawdown peor que −70%) = 0,8%.
+- El 23% de los años naturales salen en pérdidas. **P(dos años perdedores seguidos en 5 años) = 17%**.
+  Una racha como 2024-25 entra dentro de lo esperable.
+- Tiempo máximo bajo el pico anterior: mediana de 554 días, p95 de 1.334 días (3,7 años).
+
+**BTC, 246 operaciones:**
+
+- Barajar el orden de las operaciones da un drawdown mediano de −46% y p95 de −63%; el histórico fue −39%. Hay
+  que contar con drawdowns de hasta ~−60%.
+- Bootstrap de operaciones: P(resultado total negativo) = 0,03%.
+- Racha perdedora más larga: 9 operaciones en la historia; al barajar, mediana de 8 y p95 de 12.
+
+## 3. Monte Carlo de parámetros (300 configuraciones al azar: periodo 30-200, trailing 2,5-5,5 ATR, SMA 20-120 días)
+
+- **El 100% son rentables**, tanto en la cartera como en BTC.
+- Sharpe de la cartera: p5 0,60, p50 0,85, p95 1,01. En BTC: p5 0,58, p50 0,87, p95 1,14.
+- Solo el 28% supera el Sharpe de comprar y mantener la cesta (0,91). La configuración elegida no es un pico
+  aislado: casi cualquier parametrización razonable funciona.
+
+## 4. Monte Carlo de ejecución (200 simulaciones)
+
+Cada simulación pierde el 15% de las señales y añade un deslizamiento de entre 0% y 0,3% por lado. En la mitad
+de ellas, además, las órdenes se ejecutan con 4 horas de retraso.
+
+| Escenario | CAGR de la cartera (p5 / p50 / p95) | % con CAGR > 0 | Sharpe p50 | CAGR de BTC p50 |
+|---|---|---|---|---|
+| Sin retraso | +22% / +25% / +28% | 100% | 0,74 | +43% |
+| 4h de retraso | +19% / +22% / +26% | 100% | 0,70 | +40% |
+
+Aguanta bien una ejecución mala. El coste es de unos 10 puntos de CAGR.
+
+## 5. Precios sintéticos (100 trayectorias por activo)
+
+| Activo | Sharpe real | Velas barajadas una a una (sin momentum): mediana, P(≥ real) | Bloques de 30 días (con momentum): mediana, P(≥ real) |
+|---|---|---|---|
+| BTC | 1,17 | −0,26, 0,00 | 0,76, 0,04 |
+| ETH | 0,74 | −0,24, 0,01 | 0,39, 0,11 |
+| SOL | 1,02 | −0,17, 0,01 | 0,53, 0,08 |
+| XRP | 0,59 | −0,31, 0,00 | 0,47, 0,41 |
+
+Si se destruye la dependencia temporal pero se mantiene la tendencia de fondo, la estrategia **pierde**. Si se
+conserva el momentum, recupera buena parte del Sharpe. La ventaja viene de la persistencia de las tendencias, y
+no simplemente de que el mercado haya subido: el efecto es real y tiene un mecanismo identificable.
+
+## 6. Sharpe probabilístico y deflactado
+
+- Tras unas 2.900 variantes, el mejor Sharpe anual esperable por puro azar es de 1,8 a 2,5. Por eso el backtest
+  completo (Sharpe 1,17) **no** supera el Deflated Sharpe (DSR ≈ 0,01): por sí solo no prueba nada.
+- Los tramos fuera de muestra, en cambio, se evaluaron con una única configuración fijada de antemano (N = 1).
+  Para ellos la medida correcta es el PSR, la probabilidad de que el Sharpe real sea mayor que cero:
+  - 11 altcoins con reglas congeladas: **0,996**;
+  - BTC 2014-17: **1,000**;
+  - BTC 2023-24: 0,93;
+  - BTC 2025-26: 0,34.
+
+## Conclusión de la batería
+
+- **Lo que respalda que la ventaja es real:**
+  - todas las configuraciones probadas son rentables;
+  - aguanta una ejecución mala;
+  - desaparece sin momentum, así que su mecanismo es identificable;
+  - fuera de muestra en las altcoins da PSR 0,996.
+- **Expectativas razonables:** CAGR de +25-35% en cartera con drawdowns del −40 al −60%, más de un año de cada
+  cuatro en pérdidas, y periodos bajo el pico de hasta 3-4 años. Dos años malos seguidos, como 2024-25, ocurren
+  un 17% de las veces.
+- **Lo que no hace:** no bate a comprar y mantener en Sharpe (0,90 frente a 0,91 en la cartera), y reoptimizarla
+  la empeora. Su valor está en el drawdown, que es la mitad, y en ganar dinero en mercados bajistas.
+- **El forward test real** (`FORWARD_TEST.md`) sigue siendo la prueba definitiva para saber si funciona hoy.
+
+```bash
+python3 robust.py all   # requiere data/min_full.npz y data/*USDT.npz (prepare_data.py, prepare_alts.sh)
+```
