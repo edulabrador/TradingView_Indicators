@@ -1,0 +1,92 @@
+//@version=6
+//
+// GitHub: https://github.com/Heavy91/TradingView_Indicators
+//
+// TradingView: https://www.tradingview.com/u/Heavy91/#published-scripts
+//
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// If you like my work, you can support me with a donation:
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// €: http://pinescripts.fetchapp.com/sell/d15d4740
+//
+// $: http://pinescripts.fetchapp.com/sell/0f9153a5
+//
+// BTC: bc1q8e4wav3t55plp6ar0xc7gh4uqrzlxc7g97ywrg
+//
+// LTC: ltc1qagcys3pyluke3xdlq94qx8p7fd3z3mj2w32grs
+//
+// ----------------------------------------------------------------------------
+// Failure Swing Strategy (Pine Script v6 port of the original v3 script)
+// ----------------------------------------------------------------------------
+// This strategy is a first attempt to countertrade the false break of a key support/resistance.
+// If a candle breaks the level, but it comes back before the close, it will trigger an order.
+// The Stop Loss is in %, the Take Profit is near the EMA.
+// The volatility filter is used to block new orders when the price is near the EMA.
+// The volatility adjustment coefficients calibrate Stop Loss and Take Profit values according to the current volatility.
+//
+// Changes from the v3 version:
+// - Stop Loss and Take Profit are real stop/limit orders (strategy.exit), filled intrabar at their
+//   level, instead of strategy.close() market orders sent at the close and filled on the next open.
+// - "Only trade towards the EMA": a long is only taken if the TP target is above the close and a short
+//   only if it is below. Without it, a long above the EMA (or a short below it) has its TP already
+//   behind the price and is closed on the bar after the entry. Disable it to get the v3 entries.
+// - Exits stay active outside the backtest range, so open positions are always managed.
+
+strategy("Failure Swing Strategy V2", overlay = true, initial_capital = 1000,
+     default_qty_type = strategy.percent_of_equity, default_qty_value = 100, pyramiding = 0,
+     commission_type = strategy.commission.percent, commission_value = 0.2,
+     margin_long = 100, margin_short = 100)
+
+period        = input.int(84, "Support & Resistance", minval = 1)
+emaLen        = input.int(120, "EMA", minval = 1)
+threshold     = input.float(5, "VolatilityFilter (%)", minval = 0, step = 0.5)
+coefficientTP = input.float(0.05, "TP_VolatilityAdjustment", step = 0.01)
+coefficientSL = input.float(0.02, "SL_VolatilityAdjustment", step = 0.01)
+slPct         = input.float(2, "Stop Loss %", minval = 0.1, step = 0.1) / 100
+emaSideFilter = input.bool(true, "Only trade towards the EMA")
+
+// === BACKTEST RANGE ===
+fromDate   = input.time(timestamp("01 Aug 2018 00:00 +0000"), "From")
+toDate     = input.time(timestamp("31 Dec 2099 23:59 +0000"), "To")
+allowShort = input.bool(true, "Allow Short")
+strategy.risk.allow_entry_in(allowShort ? strategy.direction.all : strategy.direction.long)
+
+resistance = ta.highest(high[1], period)
+support    = ta.lowest(low[1], period)
+emaBase    = ta.ema(close, emaLen)
+volatility = math.abs(open - emaBase) / emaBase
+tpTarget   = emaBase * (1 + volatility * coefficientTP * math.sign(open - emaBase))
+
+plot(resistance, "Resistance", color.gray, 1)
+plot(support, "Support", color.gray, 1)
+plot(emaBase, "EMA", color.yellow, 1)
+plot(tpTarget, "TP target", color.green, 2, plot.style_circles)
+
+//STRATEGY
+inRange = time >= fromDate and time <= toDate
+volOk   = volatility > threshold / 100
+
+//failed swing above a flat resistance / below a flat support
+shortSignal = inRange and volOk and resistance[1] == resistance[2] and high >= resistance[1] and close < resistance[1]
+longSignal  = inRange and volOk and support[1] == support[2] and low <= support[1] and close > support[1]
+if emaSideFilter
+    shortSignal := shortSignal and tpTarget < close
+    longSignal  := longSignal and tpTarget > close
+
+if shortSignal
+    strategy.entry("Short", strategy.short, comment = "Short")
+if longSignal
+    strategy.entry("Long", strategy.long, comment = "Long")
+
+//STOP LOSS & TAKE PROFIT
+//Orders sent on this bar fill on the next open, so a new position takes the close as its reference price
+float longRef  = longSignal and strategy.position_size <= 0 ? close : strategy.position_avg_price
+float shortRef = shortSignal and strategy.position_size >= 0 ? close : strategy.position_avg_price
+stopLevelL = longRef * (1 - slPct - volatility * coefficientSL)
+stopLevelS = shortRef * (1 + slPct + volatility * coefficientSL)
+
+strategy.exit("Exit Long", "Long", stop = stopLevelL, limit = tpTarget)
+strategy.exit("Exit Short", "Short", stop = stopLevelS, limit = tpTarget)
+
+plot(strategy.position_size < 0 ? stopLevelS : na, "Stop Short", color.red, 2, plot.style_circles)
+plot(strategy.position_size > 0 ? stopLevelL : na, "Stop Long", color.red, 2, plot.style_circles)

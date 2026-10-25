@@ -45,3 +45,8 @@
   The *volatility adjustment* coefficients calibrate Stop Loss and Take Profit values according to the current volatility.
   ![alt text](https://github.com/Heavy91/TradingView_Indicators/blob/master/%5Bpreview%5D%20Failure%20Swing%20S.png)
   
+  A Pine Script v6 port is in *Failure Swing (stop hunting) Strategy v6.pine*: Stop Loss and Take Profit are real
+  stop/limit orders and entries can be restricted to the side of the EMA. A backtest on BTC/USD (2018-2026,
+  1-minute intrabar resolution) found it unprofitable on every timeframe; see
+  [research/failure_swing/RESULTS.md](research/failure_swing/RESULTS.md).
+  
