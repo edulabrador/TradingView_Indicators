@@ -192,24 +192,69 @@ pierde en 2018 (−3%) y 2025 (−22%).
   el 1,1% de las veces sale una media tan mala. Es más probable un deterioro de la ventaja que una mala racha
   normal.
 
+## Prueba entre activos (`cross.py`, `cross2.py`, protocolo en `PREREG_cross.md`)
+
+Después de ver la reserva de BTC 2025-26 no se tocó ninguna regla. La estrategia se pasó **congelada** sobre 11
+criptomonedas de Binance spot (1 minuto) que no se habían usado para nada. BTCUSDT de Binance se presenta
+aparte, porque no es independiente del trabajo con BTC de Bitstamp. Cada activo se prueba desde su primer dato
+más 60 días de calentamiento hasta el 24/10/2026, con costes del 0,15% por lado. Los criterios se escribieron
+antes de ejecutar.
+
+| Activo | Desde | Operaciones | PF | CAGR | Máx. DD | Sharpe | Comprar y mantener (CAGR / Sharpe) | p frente al azar |
+|---|---|---|---|---|---|---|---|---|
+| ETH | 2017-10 | 182 | 1,61 | +29% | −59% | 0,74 | +24% / 0,68 | 0,08 |
+| SOL | 2020-10 | 121 | 2,00 | +65% | −67% | 1,02 | +84% / 1,11 | <0,005 |
+| BNB | 2018-01 | 182 | 1,71 | +15% | −84% | 0,48 | +64% / 0,94 | 0,38 |
+| XRP | 2018-07 | 159 | 1,80 | +20% | −88% | 0,59 | +12% / 0,60 | 0,045 |
+| LTC | 2018-02 | 177 | 1,15 | +1% | −91% | 0,30 | −10% / 0,32 | 0,34 |
+| ADA | 2018-06 | 167 | 1,55 | +24% | −65% | 0,64 | +3% / 0,52 | 0,045 |
+| DOGE | 2019-09 | 130 | 2,51 | +53% | −82% | 0,73 | +61% / 0,77 | 0,06 |
+| LINK | 2019-03 | 160 | 1,16 | −6% | −91% | 0,26 | +52% / 0,92 | 0,42 |
+| TRX | 2018-08 | 183 | 0,89 | −17% | −89% | −0,02 | +37% / 0,78 | 0,81 |
+| AVAX | 2020-11 | 125 | 2,26 | +73% | −75% | 1,05 | +16% / 0,67 | 0,015 |
+| DOT | 2020-10 | 126 | 1,17 | −0% | −78% | 0,30 | −20% / 0,26 | 0,44 |
+| *BTC (Binance)* | 2017-10 | 177 | 1,81 | +34% | −44% | 0,91 | +34% / 0,77 | 0,05 |
+
+**Criterios fijados de antemano:**
+
+1. Al menos 8 de 11 activos rentables (CAGR > 0 y PF > 1). Resultado: **8 de 11. Cumple.**
+2. Prueba conjunta contra entradas aleatorias con p < 0,05. Resultado: **p < 0,005**, porque ninguna de las
+   200 carteras aleatorias iguala la suma real (39,2 frente a una mediana de 18,6). **Cumple.**
+3. Profit factor mediano > 1,2. Resultado: **1,61. Cumple.**
+
+**Robustez:**
+
+- Con costes del 0,25% por lado siguen siendo rentables 7 de 11.
+- Cartera equiponderada de los 12 activos, sin rebalanceo, de 2020-11 a 2026-10: CAGR +38,8%, DD −49%,
+  Sharpe 0,92. Comprar y mantener esa misma cesta da +46,9%, −85% y 0,87.
+- En 2025-26, esa cartera queda en +0,5% (DD −26%) mientras la cesta comprada cae −33% (DD −69%).
+- Resultados anuales de la cartera: 2021 +241%, 2022 +15%, 2023 +109%, **2024 −14%, 2025 −11%**, 2026 (hasta
+  octubre) +13%.
+
 ## Veredicto
 
-- **La Failure Swing original no tiene arreglo en BTC:** su premisa está refutada por los datos.
-- **La versión de ruptura sobre los mismos niveles tiene una ventaja real a largo plazo.** Es significativa
-  fuera de muestra (t = 3,0 en 154 operaciones) y consistente en un régimen que no se usó para diseñarla
-  (2014-17).
-- **No cumple todos los criterios fijados de antemano.** Pierde en la reserva más reciente (2025-26), sus
-  vecinas también, y ese tramo es estadísticamente anómalo frente a su historia. No se puede afirmar que sea
-  rentable *hoy*.
-- **En años alcistas no supera a comprar y mantener** (2017, 2019-2021, 2023-24). Su valor está en el
-  drawdown, que es la mitad.
-- **Ya no queda ningún dato de BTC sin usar.** Seguir ajustando con estos datos sería sobreajuste. La única
-  prueba limpia que queda es el forward test con datos nuevos, o probarla en otros activos.
+- **La Failure Swing original no tiene arreglo:** su premisa (la falsa ruptura revierte) es falsa en BTC.
+- **La versión de ruptura sobre los mismos niveles es rentable a largo plazo y no por coincidencia.** Las
+  pruebas que la respaldan son independientes entre sí:
+  - 154 operaciones fuera de muestra en BTC con t = 3,0;
+  - un régimen de mercado que no se usó para diseñarla (2014-17);
+  - 11 activos nuevos con las reglas congeladas: 8 rentables, el momento de entrada mejor que el azar con
+    p < 0,005, y los tres criterios fijados de antemano cumplidos.
+- **Límites que siguen en pie:**
+  - Lleva dos años flojos: la cartera pierde en 2024 y 2025, y BTC solo pierde en 2025-26. Que el tramo de BTC
+    sea tan malo frente a su historia (p ≈ 0,01) puede ser una mala racha o un deterioro. Solo el forward test lo
+    dirá.
+  - Con el 100% del capital en un solo activo, los drawdowns por activo son enormes (−44% a −91%). Repartir el
+    capital entre activos los reduce a la mitad.
+  - Contra comprar y mantener, solo mejora el Sharpe en 4 de 11 activos. Su ventaja es el riesgo (mitad de
+    drawdown, posibilidad de ir corto), no batir siempre al mercado alcista.
+  - Todo son criptomonedas, que están muy correlacionadas entre sí. No hay prueba en otras clases de activo.
+  - El script Pine no se ha compilado en TradingView, y el motor replica sus reglas pero no es TradingView.
 
 ### Variantes probadas en total
 
 1.728 + 384 + 1 (iteraciones 1-2), más el estudio de eventos (360 celdas), más 320 (iteración 3), más 54
-vecinas. Solo una configuración llegó a las reservas.
+vecinas. Solo una configuración llegó a las reservas y a la prueba entre activos.
 
 ### Cómo reproducirlo
 
@@ -219,4 +264,6 @@ python3 dev_grid.py && python3 dev_grid2.py # iteraciones 1-2 (crea data/bars_fu
 python3 cand.py                             # candidata de la iteración 2 frente al azar
 python3 event.py && python3 bo_grid.py      # estudio de eventos e iteración 3
 python3 final.py && python3 final_tests.py  # validación, reservas y pruebas contra el azar
+./prepare_alts.sh                           # 12 pares de Binance (~2,5 GB descargados, ~2,4 GB en data/)
+python3 cross.py && python3 cross2.py       # prueba entre activos, costes y cartera
 ```

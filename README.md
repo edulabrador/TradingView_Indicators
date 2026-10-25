@@ -53,5 +53,7 @@
 - **Support/Resistance Breakout (v6):**
   Same 84-bar support/resistance levels as Failure Swing, but it trades the breakout instead of its failure,
   with a 50-day SMA trend filter and an ATR trailing stop (4h bars). Out of sample on BTC/USD it was profitable
-  in 2014-2017 and 2023-2024 (154 trades, t = 3.0) but lost in 2025-2026; see the same research report.
+  in 2014-2017 and 2023-2024 (154 trades, t = 3.0) but lost in 2025-2026. With frozen rules it was profitable
+  on 8 of 11 other crypto assets, beating random entries (p < 0.005); 2024-2025 were losing years. See the
+  same research report.
   
