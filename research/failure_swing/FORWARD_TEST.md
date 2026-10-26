@@ -17,3 +17,9 @@ cuando se esperan unas 200-250 operaciones agregadas:
 
 No se cambia ninguna regla durante la prueba. Cualquier variante nueva empieza su propio forward test desde
 cero.
+
+## Registro
+
+| Fecha de revisión | Última vela disponible | Operaciones | Media | t | Rentabilidad de la cartera | DD | Estado |
+|---|---|---|---|---|---|---|---|
+| 2026-10-26 | 2026-10-24 (ninguna posterior al inicio) | 0 | – | – | – | – | En curso, sin datos todavía |
