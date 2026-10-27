@@ -23,3 +23,33 @@ cero.
 | Fecha de revisión | Última vela disponible | Operaciones | Media | t | Rentabilidad de la cartera | DD | Estado |
 |---|---|---|---|---|---|---|---|
 | 2026-10-26 | 2026-10-24 (ninguna posterior al inicio) | 0 | – | – | – | – | En curso, sin datos todavía |
+
+---
+
+# Forward test de la cartera A (registrado el 2026-10-27, antes de que existan los datos)
+
+**Reglas congeladas:** `sharpe/portfolio_a.py`. Aplica la estrategia de ruptura (4h, 84, 4 ATR, SMA de 50 días,
+largos y cortos) a los 12 pares de Binance. Cada activo recibe el mismo riesgo: 50% de volatilidad objetivo
+dividida entre su volatilidad de 30 días y entre N, con un tope de 2x en bruto. Toda la cartera se escala a un
+25% de volatilidad anual (ventana de 30 días, tope de 3x). Todos los tamaños se reajustan una vez al día, con un
+coste del 0,15% por lado en cada nocional negociado.
+
+**Inicio:** 2026-10-27. **Evaluación:** `./prepare_alts.sh && python3 sharpe/forward_a.py`, cada mes.
+
+**Criterios**, calibrados con 20.000 trayectorias de 12 meses remuestreadas por bloques del histórico de A
+(Sharpe mediano 1,16, p5 −0,35; drawdown p5 −32%, p1 −39%):
+
+- **Parada inmediata:** un drawdown peor que **−39%** en cualquier momento. Por debajo del percentil 1, el
+  histórico dejaría de ser una descripción fiable.
+- **A los 12 meses (2027-10-27):**
+  - Sharpe ≥ 0 y drawdown mejor que −32%: **coherente** con el backtest; se sigue.
+  - Sharpe < −0,35 (p5): **fracaso**; se abandona A.
+  - Cualquier otro caso: **no concluyente**; se amplía a 24 meses con los mismos criterios.
+
+**Advertencia:** con un año de datos, el error estándar del Sharpe es de ±1. Esta prueba detecta un fallo
+grave, pero no puede demostrar por sí sola un Sharpe de 1.
+
+### Registro A
+
+| Fecha de revisión | Días | Rentabilidad | Sharpe | DD | Estado |
+|---|---|---|---|---|---|

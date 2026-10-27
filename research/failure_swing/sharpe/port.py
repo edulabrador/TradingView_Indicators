@@ -6,7 +6,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); sys.path.insert(
 import numpy as np, pandas as pd
 import assets, fast
 
-A = assets.load_all()
+try:
+    A = assets.load_all()
+except Exception:   # data not prepared yet; callers like portfolio_a set A themselves
+    A = {}
 UNIV = [a for a in assets.NAMES if a != "BTC_BS"]   # 12 Binance pairs
 COST = 0.0015
 BPY = 6 * 365
