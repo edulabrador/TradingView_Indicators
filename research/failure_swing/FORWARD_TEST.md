@@ -78,3 +78,33 @@ DD p5 −17%, p1 −20%):
 
 | Fecha de revisión | Días | Rentabilidad | Sharpe | DD | Estado |
 |---|---|---|---|---|---|
+
+---
+
+# Forward test de la estrategia Pine R2a en dos cestas de gráficos (registrado el 2026-10-27, antes de que existan los datos)
+
+**Reglas congeladas:** `single/forward_r2a.py`, que es *Breakout Momentum Vol-Target Strategy v6.pine* con sus
+valores por defecto (momentum continuo, umbral de reajuste del 10%, coste del 0,15% por lado). Cada símbolo es un
+gráfico con el mismo capital, y la cesta se rebalancea una vez al mes.
+
+**Cestas:**
+
+- **BTC + ETH:** la cesta principal, sin sesgo de selección.
+- **Top 5:** BTC, ETH, BNB, SOL y XRP. Elegida con información de hoy, así que esta prueba sirve también para
+  medir ese sesgo.
+
+**Inicio:** 2026-10-27. **Evaluación:** `python3 single/forward_r2a.py`, cada mes.
+
+**Criterios**, a partir de 10.000 trayectorias de 12 meses remuestreadas por bloques de 30 días:
+
+| Cesta | Parada inmediata (DD p1) | A los 12 meses: coherente | A los 12 meses: fracaso |
+|---|---|---|---|
+| BTC + ETH (Sharpe histórico 1,46; Sharpe p50 a 12 meses 1,38) | DD peor que −22% | Sharpe ≥ 0 y DD mejor que −18% | Sharpe < −0,54 |
+| Top 5 (Sharpe histórico 1,88; Sharpe p50 a 12 meses 1,77) | DD peor que −17% | Sharpe ≥ 0 y DD mejor que −14% | Sharpe < −0,29 |
+
+En cualquier otro caso, el resultado es no concluyente y la prueba se amplía a 24 meses.
+
+### Registro R2a
+
+| Fecha de revisión | Cesta | Días | Rentabilidad | Sharpe | DD | Estado |
+|---|---|---|---|---|---|---|

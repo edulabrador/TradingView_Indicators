@@ -7,11 +7,13 @@
 // Exposure = min(max exposure, target vol / realised vol) * (0.5 * breakout + 0.5 * momentum), where
 // - breakout: 1 after a close above the highest high of the previous 84 bars (with close above the trend SMA),
 //   0 after the bar's low touches an ATR chandelier stop (extreme close since entry - k * ATR);
-// - momentum: share of the 7/30/90-day returns that are positive (0, 1/3, 2/3 or 1).
+// - momentum: average of the 7/30/90-day log returns divided by their expected volatility, clipped to [0, 1]
+//   ("Continuous", default since the second research round) or share of positive returns ("Binary").
 // The position is resized to the target once per day (or when the breakout state changes) if the change
 // is larger than the minimum trade. Designed for 4h bars on liquid crypto pairs, spot, long only.
 // The research portfolio holds 12 pairs and adds a portfolio-level volatility target, which a single
-// TradingView strategy cannot do; expect a lower Sharpe on one symbol than on the portfolio.
+// TradingView strategy cannot do; expect a lower Sharpe on one symbol (~1.0) than on a basket of charts
+// (BTC + ETH with equal capital: ~1.4), see research/failure_swing/single/README.md.
 
 strategy("Breakout Momentum Vol-Target", overlay = true, initial_capital = 1000,
      pyramiding = 100, commission_type = strategy.commission.percent, commission_value = 0.15,
@@ -27,7 +29,8 @@ mom3       = input.int(90, "Momentum horizon 3 (days)", minval = 1)
 volDays    = input.int(30, "Volatility window (days)", minval = 2)
 targetVol  = input.float(40, "Target annual volatility (%)", minval = 1) / 100
 maxExpo    = input.float(100, "Max exposure (% of equity)", minval = 1, maxval = 100) / 100
-minTrade   = input.float(2, "Minimum resize (% of equity)", minval = 0) / 100
+minTrade   = input.float(10, "Minimum resize (% of equity)", minval = 0) / 100
+momMode    = input.string("Continuous", "Momentum signal", options = ["Continuous", "Binary"])
 
 barsPerDay = 86400 / timeframe.in_seconds()
 toBars(days) => math.max(1, math.round(days * barsPerDay))
@@ -53,10 +56,14 @@ if bo == 0 and close > resistance and upTrend
     boStop := close - trailK * atr
 
 //MOMENTUM LEG
-mom = ((close > close[toBars(mom1)] ? 1 : 0) + (close > close[toBars(mom2)] ? 1 : 0) + (close > close[toBars(mom3)] ? 1 : 0)) / 3.0
+barStd  = ta.stdev(math.log(close / close[1]), toBars(volDays))
+realVol = barStd * math.sqrt(barsPerDay * 365)
+zScore(days) => math.log(close / close[toBars(days)]) / (barStd * math.sqrt(toBars(days)))
+momBin  = ((close > close[toBars(mom1)] ? 1 : 0) + (close > close[toBars(mom2)] ? 1 : 0) + (close > close[toBars(mom3)] ? 1 : 0)) / 3.0
+momCont = math.max(0.0, math.min(1.0, (zScore(mom1) + zScore(mom2) + zScore(mom3)) / 3.0))
+mom     = momMode == "Continuous" ? (na(momCont) ? 0.0 : momCont) : momBin
 
 //SIZING
-realVol = ta.stdev(math.log(close / close[1]), toBars(volDays)) * math.sqrt(barsPerDay * 365)
 signal  = 0.5 * bo + 0.5 * mom
 expo    = na(realVol) or realVol == 0 ? 0.0 : math.min(maxExpo, targetVol / realVol) * signal
 
