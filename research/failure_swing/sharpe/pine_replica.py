@@ -1,7 +1,8 @@
 """Bar-by-bar replica of 'Breakout Momentum Vol-Target Strategy v6.pine' (orders at next open, 0.15%/side)."""
 import sys; sys.path.insert(0,'.'); sys.path.insert(0,'..')
 import numpy as np, pandas as pd, fast, assets
-def run(x, period=84, k=4.0, trend_days=50, moms=(7,30,90), vol_days=30, tv=0.40, maxe=1.0, mint=0.02, cost=0.0015):
+def run(x, period=84, k=4.0, trend_days=50, moms=(7,30,90), vol_days=30, tv=0.40, maxe=1.0, mint=0.02, cost=0.0015,
+        delay=0, skip=0.0, slip_max=0.0, rng=None):
     o,h,l,c,idx=x['o'],x['h'],x['l'],x['c'],x['idx']; n=len(c)
     res=pd.Series(h).shift(1).rolling(period).max().values; a=fast.atr(h,l,c)
     sma=pd.Series(c).rolling(trend_days*6).mean().values
@@ -10,10 +11,11 @@ def run(x, period=84, k=4.0, trend_days=50, moms=(7,30,90), vol_days=30, tv=0.40
     day=idx.floor('1D').values; newday=np.r_[True,day[1:]!=day[:-1]]
     cash=1.0; qty=0.0; bo=0; st=ext=np.nan; pend=None; eq=np.full(n,np.nan)
     for i in range(x['start'],n):
-        if pend is not None:                      # orders sent at previous close fill at this open
-            dq=pend; px=o[i]
+        if pend is not None and i>=pend[1]:       # orders sent at a previous close fill at this open
+            dq=pend[0]; px=o[i]
             if dq<0: dq=max(dq,-qty)
-            cash-=dq*px+abs(dq)*px*cost; qty+=dq; pend=None
+            c_=cost+(rng.uniform(0,slip_max) if slip_max>0 else 0.0)
+            cash-=dq*px+abs(dq)*px*c_; qty+=dq; pend=None
         prev=bo
         if bo==1:
             if l[i]<=st: bo=0
@@ -25,8 +27,10 @@ def run(x, period=84, k=4.0, trend_days=50, moms=(7,30,90), vol_days=30, tv=0.40
         sig=0.5*bo+0.5*mom[i]
         ex=0.0 if (np.isnan(vol[i]) or vol[i]==0) else min(maxe,tv/vol[i])*sig
         d=E*ex/c[i]-qty
-        if (newday[i] or bo!=prev) and abs(d)*c[i]>mint*E: pend=d
-        elif ex==0 and qty>0: pend=-qty
+        if pend is not None: continue
+        if skip>0 and rng.random()<skip: continue
+        if (newday[i] or bo!=prev) and abs(d)*c[i]>mint*E: pend=(d,i+1+delay)
+        elif ex==0 and qty>0: pend=(-qty,i+1+delay)
     return pd.Series(eq,idx).dropna().resample('1D').last().dropna()
 if __name__=='__main__':
     A=assets.load_all(); U=[a for a in assets.NAMES if a!='BTC_BS']
