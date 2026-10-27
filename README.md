@@ -57,3 +57,9 @@
   on 8 of 11 other crypto assets, beating random entries (p < 0.005); 2024-2025 were losing years. See the
   same research report.
   
+
+- **Breakout Momentum Vol-Target (v6):**
+  Long-only, no leverage. Exposure = min(1x, target vol / realised vol) x (0.5 x breakout of the 84-bar
+  resistance with an ATR trailing stop + 0.5 x share of positive 7/30/90-day returns), resized daily (4h bars).
+  On one symbol it had a median Sharpe of 1.0 across 12 crypto pairs (BTC/USD 2014-2026: 1.53) with drawdowns of
+  -20% to -45%; see [research/failure_swing/sharpe/README.md](research/failure_swing/sharpe/README.md).

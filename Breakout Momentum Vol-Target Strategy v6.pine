@@ -1,0 +1,78 @@
+//@version=6
+//
+// ----------------------------------------------------------------------------
+// Breakout + Momentum, volatility-targeted (long only, no leverage)
+// ----------------------------------------------------------------------------
+// Single-symbol version of portfolio "V6 spot" from research/failure_swing/sharpe/README.md.
+// Exposure = min(max exposure, target vol / realised vol) * (0.5 * breakout + 0.5 * momentum), where
+// - breakout: 1 after a close above the highest high of the previous 84 bars (with close above the trend SMA),
+//   0 after the bar's low touches an ATR chandelier stop (extreme close since entry - k * ATR);
+// - momentum: share of the 7/30/90-day returns that are positive (0, 1/3, 2/3 or 1).
+// The position is resized to the target once per day (or when the breakout state changes) if the change
+// is larger than the minimum trade. Designed for 4h bars on liquid crypto pairs, spot, long only.
+// The research portfolio holds 12 pairs and adds a portfolio-level volatility target, which a single
+// TradingView strategy cannot do; expect a lower Sharpe on one symbol than on the portfolio.
+
+strategy("Breakout Momentum Vol-Target", overlay = true, initial_capital = 1000,
+     pyramiding = 100, commission_type = strategy.commission.percent, commission_value = 0.15,
+     margin_long = 100, margin_short = 100, process_orders_on_close = false)
+
+period     = input.int(84, "Breakout: support/resistance bars", minval = 2)
+trailK     = input.float(4, "Breakout: trailing stop (ATR multiple)", minval = 0.5, step = 0.5)
+atrLen     = input.int(14, "ATR length", minval = 1)
+trendDays  = input.int(50, "Breakout: trend SMA (days, 0 = off)", minval = 0)
+mom1       = input.int(7, "Momentum horizon 1 (days)", minval = 1)
+mom2       = input.int(30, "Momentum horizon 2 (days)", minval = 1)
+mom3       = input.int(90, "Momentum horizon 3 (days)", minval = 1)
+volDays    = input.int(30, "Volatility window (days)", minval = 2)
+targetVol  = input.float(40, "Target annual volatility (%)", minval = 1) / 100
+maxExpo    = input.float(100, "Max exposure (% of equity)", minval = 1, maxval = 100) / 100
+minTrade   = input.float(2, "Minimum resize (% of equity)", minval = 0) / 100
+
+barsPerDay = 86400 / timeframe.in_seconds()
+toBars(days) => math.max(1, math.round(days * barsPerDay))
+
+//BREAKOUT LEG
+resistance = ta.highest(high[1], period)
+atr        = ta.atr(atrLen)
+trendSma   = ta.sma(close, toBars(trendDays))
+upTrend    = trendDays == 0 or close > trendSma
+var int   bo      = 0
+var float boStop  = na
+var float boExt   = na
+if bo == 1
+    // the stop in force during this bar was set at the previous close
+    if low <= boStop
+        bo := 0
+    else
+        boExt  := math.max(boExt, close)
+        boStop := math.max(boStop, boExt - trailK * atr)
+if bo == 0 and close > resistance and upTrend
+    bo     := 1
+    boExt  := close
+    boStop := close - trailK * atr
+
+//MOMENTUM LEG
+mom = ((close > close[toBars(mom1)] ? 1 : 0) + (close > close[toBars(mom2)] ? 1 : 0) + (close > close[toBars(mom3)] ? 1 : 0)) / 3.0
+
+//SIZING
+realVol = ta.stdev(math.log(close / close[1]), toBars(volDays)) * math.sqrt(barsPerDay * 365)
+signal  = 0.5 * bo + 0.5 * mom
+expo    = na(realVol) or realVol == 0 ? 0.0 : math.min(maxExpo, targetVol / realVol) * signal
+
+newDay  = ta.change(time("D")) != 0
+boFlip  = ta.change(bo) != 0
+targetQty = strategy.equity * expo / close
+delta     = targetQty - strategy.position_size
+if (newDay or boFlip) and math.abs(delta) * close > minTrade * strategy.equity
+    if delta > 0
+        strategy.order("Buy", strategy.long, qty = delta)
+    else
+        strategy.order("Sell", strategy.short, qty = math.min(-delta, strategy.position_size))
+if expo == 0 and strategy.position_size > 0
+    strategy.close_all(comment = "Flat")
+
+plot(resistance, "Resistance", color.gray, 1)
+plot(trendDays > 0 ? trendSma : na, "Trend SMA", color.yellow, 1)
+plot(bo == 1 ? boStop : na, "Breakout stop", color.red, 2, plot.style_circles)
+plot(expo * 100, "Target exposure %", color.teal, display = display.data_window)

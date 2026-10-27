@@ -53,3 +53,28 @@ grave, pero no puede demostrar por sí sola un Sharpe de 1.
 
 | Fecha de revisión | Días | Rentabilidad | Sharpe | DD | Estado |
 |---|---|---|---|---|---|
+
+---
+
+# Forward test de la cartera V6 spot (registrado el 2026-10-27, antes de que existan los datos)
+
+**Reglas congeladas:** `sharpe/portfolio_v6s.py`. Combina dos patas solo de largos en los 12 pares de Binance:
+la ruptura (84 / 4 ATR / SMA de 50 días) y el momentum temporal (7/30/90 días). Las dos patas tienen el mismo
+riesgo, la cartera se escala a un 25% de volatilidad con un tope de 1x, se reajusta a diario y cada nocional
+negociado paga un 0,15% por lado.
+
+**Inicio:** 2026-10-27. **Evaluación:** `python3 sharpe/forward_v6s.py`, cada mes.
+
+**Criterios**, sacados de 10.000 trayectorias de 12 meses del histórico de V6 spot (Sharpe p50 1,27, p5 −0,80;
+DD p5 −17%, p1 −20%):
+
+- **Parada inmediata:** un drawdown peor que **−20%**, es decir, por debajo del percentil 1.
+- **A los 12 meses (2027-10-27):**
+  - Sharpe ≥ 0 y drawdown mejor que −17%: **coherente**.
+  - Sharpe < −0,80: **fracaso**.
+  - Cualquier otro caso: **no concluyente**; se amplía a 24 meses.
+
+### Registro V6 spot
+
+| Fecha de revisión | Días | Rentabilidad | Sharpe | DD | Estado |
+|---|---|---|---|---|---|

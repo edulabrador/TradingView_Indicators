@@ -15,11 +15,11 @@ COST = 0.0015
 BPY = 6 * 365
 
 
-def unit_returns(x, period=84, k=4.0, trend_days=50):
+def unit_returns(x, period=84, k=4.0, trend_days=50, side="both"):
     """Per-bar return of a 1x-notional position following the breakout rules (stops intrabar), net of entry/exit
     costs; plus the position held at each close."""
     o, h, l, c = x["o"], x["h"], x["l"], x["c"]
-    sig = fast.signals(o, h, l, c, period, int(trend_days * 6))
+    sig = fast.signals(o, h, l, c, period, int(trend_days * 6), side)
     a = fast.atr(h, l, c)
     n = len(c); r = np.zeros(n); posv = np.zeros(n)
     pos = 0; st = ext = np.nan; ent_i = 0; pend = None

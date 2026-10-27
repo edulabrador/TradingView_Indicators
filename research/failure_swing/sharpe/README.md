@@ -56,3 +56,71 @@ estándar.
 Usa la **cartera A**: la estrategia de ruptura en los 12 pares con riesgo a partes iguales y objetivo de
 volatilidad del 25%. Pasa de Sharpe 0,90 a 1,14 con todos los costes y su drawdown de −28% es menos de la mitad.
 Si la entra al forward test, debe hacerlo con sus propios criterios, porque es una variante nueva.
+
+---
+
+# Segunda ronda: hacia un objetivo realista (Sharpe ≥ 1,3)
+
+**Objetivo fijado antes de iterar:** Sharpe ≥ 1,3 en el periodo completo, ≥ 1,0 en 2023-26 y ninguna prueba de
+sensibilidad por debajo de 1,1, siempre con costes completos. En esta ronda se evaluaron unas 30 carteras más
+(`it6.py` a `it9.py`).
+
+| Variante | Sharpe | Desarrollo | 2023-26 | 2025-26 | CAGR | DD |
+|---|---|---|---|---|---|---|
+| A (referencia) | 1,14 | 1,36 | 0,82 | 0,44 | +39% | −28% |
+| V1: A + momentum temporal 7/30/90 días, largos y cortos | 1,28 | 1,65 | 0,76 | 0,36 | +45% | −29% |
+| V2: solo los cortos de A | 0,30 | 0,45 | 0,09 | 0,06 | +5% | −42% |
+| V3: A con reajuste semanal | 0,98 | 1,24 | 0,59 | 0,32 | +37% | −35% |
+| V5: A solo largos | 1,18 | 1,26 | 1,08 | 0,52 | +36% | −33% |
+| **V6: ruptura en largos + momentum temporal en largos, riesgo a partes iguales** | **1,33 ± 0,46** | 1,38 | **1,27** | 0,69 | +40% | −36% |
+| **V6 spot: V6 con tope de 1x (sin apalancamiento)** | 1,46 ± 0,48 | 1,63 | 1,21 | 0,40 | +25% | **−20%** |
+| Control: cesta siempre comprada con el mismo dimensionamiento | 0,73 | 0,76 | 0,68 | −0,13 | +18% | −49% |
+
+**Por qué V6 es robusta y no sobreajuste:**
+
+- La mejora frente a A aparece **en todos los periodos, incluido 2023-26**. En V1, en cambio, la mejora salía
+  solo del periodo de desarrollo.
+- Aporta **+0,6 de Sharpe frente a la cesta comprada** con idéntico dimensionamiento (correlación 0,67), así que
+  no es simple exposición al mercado.
+- **17 pruebas de sensibilidad**, cambiando una cosa cada vez:
+  - ventanas de volatilidad de 15 a 90 días;
+  - horizontes de momentum 3/14/60, 14/60/180 o solo 30;
+  - ruptura con periodo 42 a 168, de 3 a 5 ATR y SMA de 0 a 100 días;
+  - tope de apalancamiento de 1x a 3x;
+  - costes del 0,05% al 0,25%.
+
+  El Sharpe total queda entre **1,19 y 1,46** y el de 2023-26 entre 1,09 y 1,42.
+- Los cortos apenas aportaban (Sharpe 0,30) y en la realidad pagarían financiación. Ir solo en largos simplifica
+  y permite operar en spot.
+
+**Expectativa realista:** un Sharpe de **~1,3**, la mediana de la banda de sensibilidad. No 1,46, porque el tope
+de 1x se eligió después de ver las sensibilidades, aunque fue por un motivo práctico: poder operar en spot.
+
+**Monte Carlo de V6 spot** (bloques de 30 días):
+
+| Horizonte | Sharpe (p5 / p50) | Rentabilidad anual (p5 / p50) | DD (p1 / p5 / p50) | P(perder) |
+|---|---|---|---|---|
+| 12 meses | −0,80 / 1,27 | −9% / +21% | −20% / −17% / −10% | 16% |
+| 5 años | 0,49 / 1,34 | +6% / +23% | −34% / −28% / −17% | 1% |
+
+**Año a año (V6 spot):** 2017 +30%, 2018 −12%, 2019 +29%, 2020 +65%, 2021 +77%, 2022 −12%, 2023 +33%, 2024 +36%,
+2025 +5%, 2026 +4%. Al ser solo de largos, pierde en los años bajistas (2018 y 2022), que es justo cuando ganaba
+A gracias a los cortos.
+
+## Versión Pine: *Breakout Momentum Vol-Target Strategy v6.pine*
+
+Es la lógica de V6 aplicada a **un solo símbolo**:
+
+- exposición = mín(1x, volatilidad objetivo / volatilidad de 30 días) × (0,5 × ruptura + 0,5 × momentum);
+- reajuste diario, órdenes en la apertura siguiente, solo largos y sin apalancamiento.
+
+Se replicó vela a vela en Python (`pine_replica.py`):
+
+- Por activo, el Sharpe mediano es **1,00**, frente a 0,72 de comprar y mantener. Supera a comprar y mantener en
+  10 de 12 activos, con drawdowns del −20% al −45% frente a −78% a −99%.
+- **BTC de Bitstamp 2014-26: Sharpe 1,53, DD −30%.**
+- Los 12 activos con la versión Pine en cartera equiponderada dan Sharpe 1,48, con 1,18 en 2023-26 y 0,17 en
+  2025-26.
+
+En un único gráfico de TradingView hay que esperar un Sharpe de ~1,0. Para acercarse a 1,3-1,5 hay que operar
+varios pares a la vez.
